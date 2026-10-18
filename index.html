@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhịp Đập Trái Tim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#14040c;
+  --bg-1:#2a0818;
+  --bg-2:#4a0e2b;
+  --rose:#ff4d6d;
+  --blush:#ffb3c1;
+  --ink:#ffe9ef;
+  --deep:#c9184a;
+  --gold:#ffd8a8;
+  --ui-font:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --script:'Dancing Script','Segoe Script','Brush Script MT',cursive;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+html{background:var(--bg-0);overflow:hidden}
+body{
+  margin:0;
+  background-color:var(--bg-0);
+  background-image:radial-gradient(ellipse at 50% 38%,var(--bg-2) 0%,var(--bg-1) 52%,var(--bg-0) 100%);
+  color:var(--ink);
+  font-family:var(--ui-font);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  overflow:hidden;
+}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+.words{
+  position:fixed;left:0;right:0;bottom:0;top:49%;
+  display:flex;align-items:center;justify-content:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  pointer-events:none;
+}
+.line{
+  min-width:0;max-width:19em;margin:0;text-align:center;
+  font-family:var(--script);font-weight:600;
+  font-size:clamp(1.8rem,6.2vw,3rem);line-height:1.3;
+  text-wrap:balance;color:var(--ink);
+  text-shadow:0 0 22px rgba(255,77,109,.6),0 2px 14px rgba(40,0,16,.7);
+  transition:opacity .7s ease;
+}
+.line.out{opacity:0}
+.w{
+  display:inline-block;opacity:0;transform:translateY(.5em);filter:blur(6px);
+  transition:opacity .9s ease,transform .9s ease,filter .9s ease;
+  transition-delay:calc(var(--i,0) * .11s);
+}
+.line.in .w{opacity:1;transform:none;filter:none}
+
+.bar{
+  position:fixed;z-index:5;
+  top:calc(env(safe-area-inset-top,0px) + 12px);
+  right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;gap:8px;
+}
+.btn{
+  font:500 .85rem/1 var(--ui-font);color:var(--ink);
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,179,193,.3);
+  border-radius:999px;padding:.7rem 1.1rem;min-height:44px;
+  cursor:pointer;transition:background .2s ease,border-color .2s ease;
+}
+.btn:hover{background:rgba(255,77,109,.22);border-color:rgba(255,179,193,.6)}
+.btn:focus-visible{outline:2px solid var(--blush);outline-offset:2px}
+.btn.primary{background:var(--rose);border-color:var(--rose);color:#2a0414}
+.btn.primary:hover{background:#ff6b85}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--blush)}
+
+.scrim{
+  position:fixed;inset:0;z-index:10;display:grid;place-items:center;
+  background:rgba(14,2,8,.72);
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));
+}
+.card{
+  width:min(520px,100%);min-width:0;
+  background:#2a0818;border:1px solid rgba(255,179,193,.28);border-radius:16px;
+  padding:20px;display:flex;flex-direction:column;gap:12px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.card h2{margin:0;font:600 1.6rem/1.2 var(--script);color:var(--ink)}
+.hint{margin:0;font-size:.85rem;line-height:1.5;color:var(--blush)}
+textarea{
+  width:100%;min-width:0;box-sizing:border-box;resize:vertical;
+  font:400 1rem/1.5 var(--ui-font);color:var(--ink);
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,179,193,.3);
+  border-radius:10px;padding:12px;
+}
+textarea:focus-visible{outline:2px solid var(--blush);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (prefers-reduced-motion:reduce){
+  .w{transition:none;transition-delay:0s;transform:none;filter:none}
+  .line{transition:none}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage" aria-hidden="true"></canvas>
+<div class="words" id="words" aria-live="polite"></div>
+
+<div class="bar">
+  <button class="btn" id="btnEdit" type="button">Viết lời</button>
+  <button class="btn" id="btnReplay" type="button">Phát lại</button>
+</div>
+
+<div class="scrim" id="panel" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <h2 id="panelTitle">Lời của bạn</h2>
+    <p class="hint">Mỗi dòng là một lời nhắn, hiện lần lượt sau khi các trái tim hợp lại. Lời được lưu trên trình duyệt này.</p>
+    <label class="sr" for="msgInput">Lời nhắn</label>
+    <textarea id="msgInput" rows="8"></textarea>
+    <div class="row">
+      <button class="btn quiet" id="btnSample" type="button">Dùng lời mẫu</button>
+      <button class="btn" id="btnClose" type="button">Đóng</button>
+      <button class="btn primary" id="btnSave" type="button">Lưu và phát lại</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- LỜI NHẮN: sửa các câu này thành lời của bạn ---------- */
+var DEFAULTS=[
+  'Có một trái tim đang đập thật nhanh mỗi khi nghĩ về người.',
+  'Cảm ơn vì đã đến, và làm cuộc đời này dịu dàng hơn.',
+  'Chỉ cần có người ở bên, ngày nào cũng là một ngày đẹp.',
+  'Yêu người nhiều hơn những gì lời nói có thể kể hết.',
+  'Mình ở bên nhau thật lâu nhé.'
+];
+var KEY='nhip-dap-trai-tim:msgs';
+
+function parse(s){
+  return s.split('\n').map(function(x){return x.trim();}).filter(Boolean).slice(0,12).map(function(x){return x.slice(0,160);});
+}
+function loadMsgs(){
+  try{
+    var s=localStorage.getItem(KEY);
+    if(s){var a=parse(s); if(a.length) return a;}
+  }catch(e){}
+  return DEFAULTS.slice();
+}
+var messages=loadMsgs();
+
+/* ---------- Tiện ích ---------- */
+var REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function lerp(a,b,t){return a+(b-a)*t;}
+function ease(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+var BPS=1.1;
+var BEAT=REDUCED?.06:.2;
+var AMP=REDUCED?.015:.05;
+function beat(x){
+  var p=x-Math.floor(x);
+  return Math.exp(-Math.pow((p-.10)/.06,2))+.65*Math.exp(-Math.pow((p-.30)/.07,2));
+}
+function hx(t){return 16*Math.pow(Math.sin(t),3);}
+function hy(t){return -(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t)+2.65);}
+
+/* ---------- Mốc thời gian (giây) ---------- */
+var T_GS=6.4;      /* bắt đầu hợp lại */
+var T_SHIFT=10.4;  /* trái tim lớn nhấc lên */
+var T_MSG0=11.4;   /* lời đầu tiên hiện ra */
+var T_OFF=REDUCED?12:0;
+
+/* ---------- Canvas ---------- */
+var cv=document.getElementById('stage');
+var ctx=cv.getContext('2d');
+var w=0,h=0,dpr=1;
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  w=cv.clientWidth||window.innerWidth;
+  h=cv.clientHeight||window.innerHeight;
+  cv.width=Math.round(w*dpr);
+  cv.height=Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resize);
+resize();
+
+/* ---------- Hình trái tim dựng sẵn ---------- */
+function mix(hex,t){
+  var n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
+  if(t>=0){r=r+(255-r)*t;g=g+(255-g)*t;b=b+(255-b)*t;}
+  else{var k=1+t;r*=k;g*=k;b*=k;}
+  return 'rgb('+Math.round(r)+','+Math.round(g)+','+Math.round(b)+')';
+}
+function makeSprite(color){
+  var S=128,u=2.3,c=document.createElement('canvas');
+  c.width=c.height=S;
+  var x=c.getContext('2d');
+  x.translate(S/2,S/2);
+  x.beginPath();
+  for(var i=0;i<=72;i++){
+    var t=i/72*Math.PI*2,px=hx(t)*u,py=hy(t)*u;
+    if(i)x.lineTo(px,py);else x.moveTo(px,py);
+  }
+  x.closePath();
+  var g=x.createLinearGradient(-16*u,-14*u,14*u,14*u);
+  g.addColorStop(0,mix(color,.45));
+  g.addColorStop(.55,color);
+  g.addColorStop(1,mix(color,-.35));
+  x.fillStyle=g;
+  x.shadowColor=color;
+  x.shadowBlur=16;
+  x.fill();
+  x.shadowBlur=0;
+  x.globalAlpha=.4;
+  x.fillStyle='#ffffff';
+  x.beginPath();
+  x.ellipse(-7*u,-8*u,3.4*u,1.8*u,-.5,0,Math.PI*2);
+  x.fill();
+  return c;
+}
+var COLORS=['#a4133c','#c9184a','#ff4d6d','#ff758f','#ff8fa3','#ffb3c1','#ffd8a8'];
+var sprites=COLORS.map(makeSprite);
+var SPR=128/(32*2.3);
+
+/* ---------- Các trái tim ---------- */
+var LAYERS=[1,.86,.72,.58,.44,.3,.16];
+var hearts=[];
+LAYERS.forEach(function(s,li){
+  var c=Math.max(4,Math.round(34*s));
+  for(var k=0;k<c;k++){
+    var t=li*.7+k/c*Math.PI*2;
+    var ci=clamp(Math.round(1+li*.75+(Math.random()-.5)*1.4),0,5);
+    if(Math.random()<.07) ci=6;
+    hearts.push({
+      tx:hx(t)*s, ty:hy(t)*s,
+      k:2.6*(.75+.25*s)*(.9+Math.random()*.2),
+      ci:ci, ph:Math.random(),
+      inD:Math.random()*1.4, gd:Math.random()*.9,
+      wob:Math.random()*Math.PI*2
+    });
+  }
+});
+(function assignOrbits(){
+  var RF=[.38,.6,.82,1], tot=[0,0,0,0], seen=[0,0,0,0];
+  hearts.forEach(function(q,i){q.ring=i%4;tot[q.ring]++;});
+  hearts.forEach(function(q){
+    var r=q.ring;
+    q.rf=RF[r]+(Math.random()-.5)*.1;
+    q.dir=r%2===0?1:-1;
+    q.om=.55/(RF[r]+.3);
+    q.a0=seen[r]/tot[r]*Math.PI*2+(Math.random()-.5)*.25;
+    seen[r]++;
+  });
+})();
+
+/* tim nhỏ trôi nền + sao lấp lánh */
+var amb=[];
+for(var ai=0;ai<26;ai++){
+  amb.push({x:Math.random(),y:Math.random(),v:8+Math.random()*20,sz:8+Math.random()*14,a:.1+Math.random()*.22,ph:Math.random()*6.28,ci:Math.floor(Math.random()*6)});
+}
+var stars=[];
+for(var si=0;si<46;si++){
+  stars.push({x:Math.random(),y:Math.random(),r:.6+Math.random()*1.4,ph:Math.random()*6.28,sp:.8+Math.random()*1.6});
+}
+var bursts=[];
+function spawn(n,cx,cy,W){
+  if(REDUCED) return;
+  for(var i=0;i<n;i++){
+    var a=-Math.PI/2+(Math.random()-.5)*1.8,sp=70+Math.random()*120;
+    bursts.push({
+      x:cx+(Math.random()-.5)*W*.6, y:cy-Math.random()*W*.2,
+      vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+      life:2+Math.random()*1.6, age:0,
+      sz:8+Math.random()*10, ci:Math.floor(Math.random()*6)
+    });
+  }
+}
+
+/* ---------- Lời nhắn ---------- */
+var wordsEl=document.getElementById('words');
+var starts=[],durs=[];
+function buildSchedule(){
+  starts=[];durs=[];
+  var s=T_MSG0;
+  messages.forEach(function(m){
+    var d=Math.min(8,3.4+m.length*.045);
+    starts.push(s);durs.push(d);s+=d;
+  });
+}
+function showMsg(i){
+  var words=messages[i].split(/\s+/);
+  wordsEl.innerHTML='';
+  var p=document.createElement('p');
+  p.className='line';
+  words.forEach(function(wd,k){
+    var sp=document.createElement('span');
+    sp.className='w';
+    sp.style.setProperty('--i',k);
+    sp.textContent=wd;
+    p.appendChild(sp);
+    if(k<words.length-1) p.appendChild(document.createTextNode(' '));
+  });
+  wordsEl.appendChild(p);
+  void p.offsetWidth;
+  p.classList.add('in');
+}
+
+/* ---------- Vòng lặp ---------- */
+var t0=performance.now(),last=t0,msgState=-1,formedBurst=false,hiddenAt=0;
+buildSchedule();
+function restart(){
+  t0=performance.now();last=t0;msgState=-1;formedBurst=false;
+  bursts.length=0;wordsEl.innerHTML='';
+  buildSchedule();
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){hiddenAt=performance.now();}
+  else if(hiddenAt){t0+=performance.now()-hiddenAt;hiddenAt=0;}
+});
+
+function frame(now){
+  var dt=Math.min(.05,(now-last)/1000);last=now;
+  var t=(now-t0)/1000+T_OFF;
+  ctx.clearRect(0,0,w,h);
+
+  var sh=ease(clamp((t-T_SHIFT)/1.5,0,1));
+  var Wbig=Math.min(w*.78,h*.5,520),Wsm=Math.min(w*.5,h*.27,300);
+  var W=lerp(Wbig,Wsm,sh),U=W/32,cx=w/2,cy=lerp(h*.5,h*.3,sh);
+  var Rx=Math.min(w*.44,h*.45,460),Ry=Math.min(Rx*.85,h*.42);
+  var Fm=clamp((t-(T_GS+2.1))/1.5,0,1);
+  var gb=beat(t*BPS);
+  var pulse=1+AMP*gb*Fm;
+  var i,q;
+
+  /* sao */
+  for(i=0;i<stars.length;i++){
+    var st=stars[i];
+    var sa=.25+.5*(.5+.5*Math.sin(t*st.sp+st.ph));
+    ctx.fillStyle='rgba(255,214,224,'+sa.toFixed(3)+')';
+    ctx.beginPath();ctx.arc(st.x*w,st.y*h,st.r,0,Math.PI*2);ctx.fill();
+  }
+
+  /* tim nhỏ trôi nền */
+  for(i=0;i<amb.length;i++){
+    var m=amb[i];
+    var ay=(((m.y*h-m.v*t)%h)+h)%h;
+    var ax=m.x*w+Math.sin(t*.6+m.ph)*14;
+    var ds0=m.sz*SPR;
+    ctx.globalAlpha=m.a;
+    ctx.drawImage(sprites[m.ci],ax-ds0/2,ay-ds0/2,ds0,ds0);
+  }
+  ctx.globalAlpha=1;
+
+  /* ánh sáng sau trái tim */
+  var ga=(.10+.30*Fm)*(.85+.3*gb);
+  var gr=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.8);
+  gr.addColorStop(0,'rgba(255,77,109,'+ga.toFixed(3)+')');
+  gr.addColorStop(.5,'rgba(201,24,74,'+(ga*.45).toFixed(3)+')');
+  gr.addColorStop(1,'rgba(201,24,74,0)');
+  ctx.fillStyle=gr;
+  ctx.fillRect(cx-W,cy-W,2*W,2*W);
+
+  /* các trái tim */
+  for(i=0;i<hearts.length;i++){
+    q=hearts[i];
+    var ine=clamp((t-q.inD)/.9,0,1);
+    if(ine<=0) continue;
+    var e=ease(clamp((t-T_GS-q.gd)/2.4,0,1));
+    var ang=q.a0+q.dir*q.om*t;
+    var rr=q.rf*(1+.06*Math.sin(t*1.3+q.wob));
+    var ox=Math.cos(ang)*Rx*rr,oy=Math.sin(ang)*Ry*rr;
+    var tx=q.tx*U*pulse,ty=q.ty*U*pulse;
+    var x=cx+ox*(1-e)+tx*e,y=cy+oy*(1-e)+ty*e;
+    var depth=.5+.5*Math.sin(ang);
+    var dsz=.8+.45*depth;
+    var bt=1+BEAT*beat(t*BPS+q.ph*(1-e));
+    var size=U*q.k*lerp(dsz,1,e)*bt*(.4+.6*ine);
+    var rot=(1-e)*.4*Math.sin(t*.9+q.wob);
+    var ds=size*SPR;
+    ctx.globalAlpha=ine;
+    ctx.save();
+    ctx.translate(x,y);
+    if(rot) ctx.rotate(rot);
+    ctx.drawImage(sprites[q.ci],-ds/2,-ds/2,ds,ds);
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+
+  /* viền sáng của trái tim lớn */
+  if(Fm>0){
+    ctx.save();
+    ctx.beginPath();
+    for(i=0;i<=96;i++){
+      var tt=i/96*Math.PI*2;
+      var px=cx+hx(tt)*U*1.12*pulse,py=cy+hy(tt)*U*1.12*pulse;
+      if(i)ctx.lineTo(px,py);else ctx.moveTo(px,py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle='rgba(255,214,224,'+(.35*Fm).toFixed(3)+')';
+    ctx.lineWidth=1.2;
+    ctx.shadowColor='#ff4d6d';
+    ctx.shadowBlur=14;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* tim bay lên khi hợp lại / khi có lời mới */
+  if(!formedBurst&&t>=T_GS+3.3){formedBurst=true;spawn(18,cx,cy,W);}
+  for(i=bursts.length-1;i>=0;i--){
+    var b=bursts[i];
+    b.age+=dt;
+    if(b.age>=b.life){bursts.splice(i,1);continue;}
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.vy+=30*dt;b.vx*=.99;
+    var k=b.age/b.life;
+    var dsb=b.sz*(.7+.6*k)*SPR;
+    ctx.globalAlpha=(1-k)*.9;
+    ctx.drawImage(sprites[b.ci],b.x-dsb/2,b.y-dsb/2,dsb,dsb);
+  }
+  ctx.globalAlpha=1;
+
+  /* lời nhắn theo thời gian */
+  var idx=-1;
+  for(i=0;i<starts.length;i++){if(t>=starts[i])idx=i;}
+  if(idx!==msgState&&idx>=0){
+    showMsg(idx);
+    spawn(10,cx,cy,W);
+    msgState=idx;
+  }
+  if(idx>=0&&idx<starts.length-1&&t>=starts[idx]+durs[idx]-.8){
+    var ln=wordsEl.firstChild;
+    if(ln) ln.classList.add('out');
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- Nút điều khiển ---------- */
+var panel=document.getElementById('panel');
+var input=document.getElementById('msgInput');
+function openPanel(){input.value=messages.join('\n');panel.hidden=false;input.focus();}
+function closePanel(){panel.hidden=true;}
+document.getElementById('btnEdit').addEventListener('click',openPanel);
+document.getElementById('btnReplay').addEventListener('click',restart);
+document.getElementById('btnClose').addEventListener('click',closePanel);
+document.getElementById('btnSample').addEventListener('click',function(){input.value=DEFAULTS.join('\n');});
+document.getElementById('btnSave').addEventListener('click',function(){
+  var arr=parse(input.value);
+  if(!arr.length) arr=DEFAULTS.slice();
+  try{localStorage.setItem(KEY,arr.join('\n'));}catch(e){}
+  messages=arr;
+  closePanel();
+  restart();
+});
+panel.addEventListener('click',function(ev){if(ev.target===panel)closePanel();});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&!panel.hidden)closePanel();});
+})();
+</script>
+</body>
+</html>
